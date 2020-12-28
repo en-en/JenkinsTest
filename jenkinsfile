@@ -1,0 +1,108 @@
+pipeline {
+    agent {
+        //指定此Pipeline将在动态Jenkins Slave中执行
+        label 'DM-multiplecheck-service'
+    }
+    options {
+        //设置管道运行的超时时间，在此之后，Jenkins将中止管道
+        timeout(time: 20, unit: 'MINUTES')
+        // 失败重试次数
+        retry(2)
+        //输出时间戳
+        timestamps()
+    }
+    environment {
+        //构建分支 master、test
+       //  Brand='test'
+        //定义Maven编译环境 dev/test/prod
+        // ACTIVE = "test"
+        // //jar包名称
+        // JAR_NAME = 'yss-datamiddle-multiplecheck.jar'
+        // //JOB所在根目录，JOB_NAME
+        // WORKSPACE_PATH = "/opt/dataMiddle-service/workspace/${JOB_NAME}/"
+    }
+    stages {
+         stage('备份jar包'){
+			//steps{
+			//     dir("${WORKSPACE_PATH}") {
+			//       sh '''
+			//          if [ -f "target/${JAR_NAME}" ];then
+			//             cp -r target/${JAR_NAME}  /opt/data_bak/jar_bak/$(date +%Y%m%d.%H:%M:%S)-${JAR_NAME}
+			//             echo "jar包备份成功..."
+			//          else
+			//             echo "备份的jar包不存在！"
+			//          fi
+			//       '''
+			// 	  sh '''
+			// 	  result=`find /opt/data_bak/jar_bak/ -mtime +10 -name "*-${JAR_NAME}"`
+			// 	  if [ -z "$result" ]
+            //       then
+            //           echo '不存在大于10天的 jar 包'
+            //       else
+			// 	      rm -rf $result
+			// 	  fi
+			// 	  '''
+            //     } 
+		    // }
+        }
+		stage('获取代码'){
+			steps{
+				echo "拉取代码"
+				cleanWs()
+                checkout([$class: 'GitSCM', branches: [[name: ${branch}]], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: '8c399055-1e6d-4781-802d-d3dd830a5c3a', url: 'https://github.com/en-en/JenkinsTest.git']]])
+				// git branch: 'test', credentialsId: 'b0bf5539-d8a8-4edf-92c1-1709115c2cff', url: 'http://192.168.101.94:8081/Data-Middleground-Develop-Area/product-code/service/dataMiddle-multipleCheck.git'
+			}
+		}
+        stage('Build project package') {
+            steps {
+                dir("${WORKSPACE_PATH}") {
+				  echo "开始执行打包操作......."
+                  //利用maven对项目进行build
+                  //sh "mvn -U -Dmaven.test.skip=true clean package"
+                  //利用dotnet命令打包
+                image_version= jenkinstest+${branch}+`date +%Y%m%d%H%M`
+                echo $image_version
+                docker build -t house-web:$image_version .;
+               }
+            }
+        }
+       stage("push harbor image to harbor")
+       {
+           steps{
+
+               docker login -u admin -p Harbor12345 39.104.110.227
+
+               docker push 39.104.110.227/jenkinstest/$image_version[:TAG]
+           }
+
+       }
+        
+        // stage('Run Application') {
+        //     steps {
+        //         dir("${WORKSPACE_PATH}") {
+        //           // 如果程序已经启动，杀掉进程
+		// 		  sh '''
+		// 		    count=`ps -ef | grep ${JAR_NAME} | grep -v "grep" | wc -l`
+        //             if [ $count -gt 0 ]; then
+        //                 ps aux|grep ${JAR_NAME}|grep -v grep|awk '{print $2}'|xargs kill -9
+        //             fi
+        //             '''
+        //           echo "启动程序......."
+        //           //利用maven对项目进行build
+        //           sh '''
+        //           JENKINS_NODE_COOKIE=dontKillMe
+        //           nohup /opt/jdk-11.0.8/bin/java -jar -Xms4096m -Xmx4096m target/${JAR_NAME} --spring.profiles.active=${ACTIVE}  --server.port=30180 --debug > /opt/data_bak/logs/${JAR_NAME}.log 2>&1 & 
+        //           '''
+        //       }
+        //     }
+        // }
+    }
+    post {
+        success {
+             echo "'${env.JOB_NAME} [${env.BUILD_NUMBER}]' 构建成功"
+        }
+        failure {
+            echo "'${env.JOB_NAME} [${env.BUILD_NUMBER}]' 构建失败"
+        }
+    }
+}

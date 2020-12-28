@@ -1,0 +1,101 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: bigdata-interface
+    version: default
+  name: bigdata-interface
+  namespace: architect
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bigdata-interface
+      version: default
+  template:
+    metadata:
+      labels:
+        app: bigdata-interface
+        version: default
+    spec:
+      containers:
+      - env:
+        - name: izone
+        - name: MY_SERVICE_NAME
+          value: bigdata-interface
+        - name: ilogEnvs
+          value: izone,buildNumber
+        - name: ILOG_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              key: ILOG_BOOTSTRAP_SERVERS
+              name: global-config
+        - name: CONFIG_SERVER_URL
+          valueFrom:
+            configMapKeyRef:
+              key: CONFIG_SERVER_URL
+              name: global-config
+        - name: CONFIG_SERVER_USER
+          valueFrom:
+            configMapKeyRef:
+              key: CONFIG_SERVER_USER
+              name: global-config
+        - name: CONFIG_SERVER_PWDS
+          valueFrom:
+            configMapKeyRef:
+              key: CONFIG_SERVER_PWDS
+              name: global-config
+        - name: CONFIG_SERVER_PWDS
+          valueFrom:
+            configMapKeyRef:
+              key: CONFIG_SERVER_PWDS
+              name: global-config
+        - name: JAR_BOOT_ARG
+          value: --spring.cloud.config.fail-fast=true
+        - name: JDK_HEAP_OPTS
+          value: -Xms256m -Xmx256m
+        image: dev-hub.jiatuiyun.net/architect/bigdata-interface:architect_b63
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 2
+          httpGet:
+            path: /actuator/info
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 300
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 30
+        name: bigdata-interface
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/info
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 30
+        volumeMounts:
+        - mountPath: /opt/jdk
+          name: jdk-path
+        - mountPath: /srv/applogs
+          name: applogs
+      imagePullSecrets:
+      - name: registry-secret
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - hostPath:
+          path: /usr/local/jdk/default
+          type: ""
+        name: jdk-path
+      - hostPath:
+          path: /data/applogs
+          type: ""
+        name: applogs
