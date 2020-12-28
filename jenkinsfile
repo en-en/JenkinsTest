@@ -60,7 +60,7 @@ pipeline {
                   //利用maven对项目进行build
                   //sh "mvn -U -Dmaven.test.skip=true clean package"
                   //利用dotnet命令打包
-                image_version= jenkinstest+${branch}+`date +%Y%m%d%H%M`
+                image_version= "jenkinstest"+${branch}+`date +%Y%m%d%H%M`
                 echo $image_version
                 docker build -t house-web:$image_version .;
                }
