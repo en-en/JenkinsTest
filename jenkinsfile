@@ -1,28 +1,59 @@
-node() {
-
-    stage('pull') {
-        echo "拉取代码"
-           checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: '303325d0-e6fd-40dc-9a5f-4fbeab6a0c4b', url: 'https://github.com/en-en/JenkinsTest.git']]])
-   
-   docker_img_name="jenkinstest"
+node ('haimaxy-jnip'){
+  stage('Clone') {
+    echo "1.Clone Stage"
+    checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'github', url: 'https://github.com/en-en/JenkinsTest.git']]])
+    script {
+        build_tag = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
     }
-
-
-    stage('Test') {
-        echo "2.Test Stage"
+    
+  }
+  stage('Test') {
+    echo "2.Test Stage"
+  }
+  stage('Build') {
+    echo "3.Build Stage"
+    sh "docker build -t 39.104.110.227:8031/k8sdemo/jenkins-demo:${build_tag} ."
+    
+  }
+  
+  stage('Push') {
+    echo "4.Push Docker Image Stage"
+        withCredentials([usernamePassword(credentialsId: 'harbor', passwordVariable: 'harborPassword', usernameVariable: 'harborUser')]) {
+        sh "docker login -u ${harborUser} -p ${harborPassword} 39.104.110.227:8031"
+        sh "docker push 39.104.110.227:8031/k8sdemo/jenkins-demo:${build_tag}"
     }
-    stage('Build') {
-        echo "3.Build Docker Image Stage"
-        sh "docker build -t ${docker_img_name} ."
-    }
-
-    stage('Push') {
-        echo "4.Deploy jar and Push Docker Image Stage"
-        
-        sh "docker login -u admin -p Harbor12345 39.104.110.227"
-        sh "docker push 39.104.110.227/jenkinstest/${docker_img_name}:${tag} ."
-    }
-
-    //stash 'complete-build'
 }
 
+  stage('Deploy') {
+    echo "5. Change YAML File Stage"
+    
+    def userInput = input(
+        id: 'userInput',
+        message: 'Choose a deploy environment',
+        parameters: [
+            [
+                $class: 'ChoiceParameterDefinition',
+                choices: "Dev\nQA\nProd",
+                name: 'Env'
+            ]
+        ]
+    )
+    
+    sh "sed -i 's/<BUILD_TAG>/${build_tag}/' jenkins.yaml"
+    sh "sed -i 's/<BRANCH_NAME>/${env.BRANCH_NAME}/' jenkins.yaml"
+    
+    
+       if (userInput.Env == "Dev") {
+      // deploy dev stuff
+    } else if (userInput.Env == "QA"){
+      // deploy qa stuff
+    } else {
+      // deploy prod stuff
+    }
+    
+     sh "kubectl apply -f jenkins.yaml"
+    
+}
+  
+
+}
