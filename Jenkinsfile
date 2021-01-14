@@ -4,6 +4,9 @@ node ('haimaxy-jnip'){
     checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'github', url: 'https://github.com/en-en/JenkinsTest.git']]])
     script {
         build_tag = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+		  if (env.BRANCH_NAME != 'master') {
+                build_tag = "${env.BRANCH_NAME}-${build_tag}"
+            }
     }
     
   }
@@ -38,10 +41,10 @@ node ('haimaxy-jnip'){
             ]
         ]
     )
-    
+	sh "sed -i 's/<BRANCH_NAME>/${env.BRANCH_NAME}/' jenkins.yaml"
+	
     sh "sed -i 's/<BUILD_TAG>/${build_tag}/' jenkins.yaml"
-    sh "sed -i 's/<BRANCH_NAME>/${env.BRANCH_NAME}/' jenkins.yaml"
-    
+
     
        if (userInput.Env == "Dev") {
       // deploy dev stuff
